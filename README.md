@@ -1,7 +1,7 @@
 # epub_cover_modifier
 
 ### 介绍:
-不少导出epub的缩略图电脑无法正确显示，我写了一个python小程序处理，然后打包了。
+不少kindle导出epub的缩略图电脑无法正确显示，我写了一个python小程序处理，然后打包了。
 
 > 注：电脑显示缩略图用的是 [DarkThumbs](https://github.com/fire-eggs/DarkThumbs)。
 
