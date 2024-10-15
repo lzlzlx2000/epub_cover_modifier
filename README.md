@@ -1,6 +1,5 @@
 # epub_cover_modifier
 
-（修改后在手机上会出现显示问题，在改）
 
 ### 介绍:
 不少kindle导出epub的缩略图电脑无法正确显示，我写了一个python小程序处理，然后打包了。
