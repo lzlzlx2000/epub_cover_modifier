@@ -2,18 +2,19 @@ import os
 import zipfile
 import xml.etree.ElementTree as ET
 import shutil
-
+import re
+import sys
 
 def modify_epub_cover(epub_path, output_dir, new_cover_filename='cover.jpg'):
-    # Create a temporary directory
-    temp_dir = 'temp_epub'
+    # 创建临时目录
+    temp_dir = os.path.join(os.path.dirname(epub_path), 'temp_epub')
     os.makedirs(temp_dir, exist_ok=True)
 
-    # Extract the epub
+    # 解压 epub
     with zipfile.ZipFile(epub_path, 'r') as zip_ref:
         zip_ref.extractall(temp_dir)
 
-    # Find and parse the content.opf file
+    # 查找并解析 content.opf 文件
     opf_path = None
     for root, dirs, files in os.walk(temp_dir):
         for file in files:
@@ -24,50 +25,53 @@ def modify_epub_cover(epub_path, output_dir, new_cover_filename='cover.jpg'):
             break
 
     if not opf_path:
-        print(f"Error: content.opf not found in {epub_path}")
         shutil.rmtree(temp_dir)
         return
 
-    # Parse the content.opf file
+    # 解析 content.opf 文件
     tree = ET.parse(opf_path)
     root = tree.getroot()
 
-    # Define the namespace
+    # 定义命名空间
     ns = {'opf': 'http://www.idpf.org/2007/opf'}
 
-    # Find the manifest element
+    # 查找 manifest 元素
     manifest = root.find('opf:manifest', ns)
 
-    # Find the cover image item
+    # 查找封面图片项
     cover_item = manifest.find(".//opf:item[@properties='cover-image']", ns)
 
     if cover_item is not None:
-        # Get the old filename
+        # 获取旧文件名
         old_filename = cover_item.get('href').split('/')[-1]
         old_path = os.path.join(os.path.dirname(opf_path), cover_item.get('href'))
 
-        # Update the cover image item attributes
+        # 更新封面图片项属性
         new_href = cover_item.get('href').replace(old_filename, new_cover_filename)
         cover_item.set('href', new_href)
 
-        # Save the modified content.opf file
+        # 保存修改后的 content.opf 文件
         tree.write(opf_path, encoding='utf-8', xml_declaration=True)
 
-        print(
-            f"Updated content.opf in {epub_path}: Changed cover image reference from {old_filename} to {new_cover_filename}")
-
-        # Rename the actual image file
+        # 重命名实际的图片文件
         new_path = os.path.join(os.path.dirname(old_path), new_cover_filename)
 
         if os.path.exists(old_path):
             os.rename(old_path, new_path)
-            print(f"Renamed image file from {old_filename} to {new_cover_filename}")
-        else:
-            print(f"Warning: Cover image file {old_filename} not found in {epub_path}")
-    else:
-        print(f"Error: Cover image item not found in content.opf of {epub_path}")
 
-    # Create a new epub file
+        # 修改 p-cover.xhtml 文件
+        cover_xhtml_path = os.path.join(temp_dir, 'OEBPS', 'Text', 'p-cover.xhtml')
+        if os.path.exists(cover_xhtml_path):
+            with open(cover_xhtml_path, 'r', encoding='utf-8') as file:
+                content = file.read()
+
+            # 使用正则表达式替换图片文件名
+            new_content = re.sub(r'xlink:href="[^"]*"', f'xlink:href="../Images/{new_cover_filename}"', content)
+
+            with open(cover_xhtml_path, 'w', encoding='utf-8') as file:
+                file.write(new_content)
+
+    # 创建新的 epub 文件
     output_epub_path = os.path.join(output_dir, os.path.basename(epub_path))
     with zipfile.ZipFile(output_epub_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk(temp_dir):
@@ -76,23 +80,24 @@ def modify_epub_cover(epub_path, output_dir, new_cover_filename='cover.jpg'):
                 arcname = os.path.relpath(file_path, temp_dir)
                 zipf.write(file_path, arcname)
 
-    print(f"Created modified epub: {output_epub_path}")
-
-    # Clean up temporary directory
+    # 清理临时目录
     shutil.rmtree(temp_dir)
 
-
-def process_all_epubs(output_dir):
-    # Create output directory if it doesn't exist
+def process_epubs(directory):
+    output_dir = os.path.join(directory, 'output')
     os.makedirs(output_dir, exist_ok=True)
 
-    # Process all epub files in the current directory
-    for filename in os.listdir('.'):
+    for filename in os.listdir(directory):
         if filename.endswith('.epub'):
-            epub_path = os.path.join('.', filename)
+            epub_path = os.path.join(directory, filename)
             modify_epub_cover(epub_path, output_dir)
 
+if __name__ == "__main__":
+    if len(sys.argv) > 1:
+        # 如果有参数，处理指定目录
+        target_dir = sys.argv[1]
+    else:
+        # 否则处理当前目录
+        target_dir = os.getcwd()
 
-# Usage
-output_dir = './output'  # Output directory
-process_all_epubs(output_dir)
+    process_epubs(target_dir)
